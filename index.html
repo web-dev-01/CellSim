@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CellSim - RF Planning &amp; Drive Test Simulator</title>
+  <meta name="description" content="A browser-based mini RF planning and drive test simulator: coverage maps, SINR, handover, PCI and network optimization.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M16 6 L10 28 M16 6 L22 28 M12.5 19 H19.5 M11.3 24 H20.7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <path d="M9 4.5 a9 9 0 0 0 0 9 M23 4.5 a9 9 0 0 1 0 9 M5.5 2 a13 13 0 0 0 0 14 M26.5 2 a13 13 0 0 1 0 14" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <div class="brand-name">CellSim</div>
+        <div class="brand-sub">RF Planning &amp; Drive Test Simulator</div>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="planner" role="tab">1. Planner</button>
+      <button class="tab" data-tab="drive" role="tab">2. Drive Test</button>
+      <button class="tab" data-tab="fix" role="tab">3. Fix the Network</button>
+      <button class="tab" data-tab="calc" role="tab">RF Calculators</button>
+      <button class="tab" data-tab="learn" role="tab">Learn</button>
+    </nav>
+  </header>
+
+  <main id="mapView" class="layout">
+    <section class="map-pane">
+      <div class="banner" id="banner" hidden></div>
+      <div class="map-toolbar">
+        <span class="toolbar-label">Map layer</span>
+        <div class="seg" id="layerSeg">
+          <button data-layer="rsrp" class="active">RSRP</button>
+          <button data-layer="sinr">SINR</button>
+          <button data-layer="rsrq">RSRQ</button>
+          <button data-layer="thr">Throughput</button>
+          <button data-layer="best">Best server</button>
+          <button data-layer="pollution">Pilot pollution</button>
+        </div>
+      </div>
+      <div class="map-wrap" id="mapWrap">
+        <canvas id="map"></canvas>
+        <div class="hover-card" id="hoverCard" hidden></div>
+        <div class="map-hint" id="mapHint"></div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="chart-card" id="chartCard" hidden>
+        <div class="chart-head">
+          <span><i class="sw" style="background:var(--rsrp-line)"></i>RSRP (dBm, left)</span>
+          <span><i class="sw" style="background:var(--sinr-line)"></i>SINR (dB, right)</span>
+          <span><i class="sw ev-ho"></i>Handover</span>
+          <span><i class="sw ev-fail"></i>HO failure</span>
+          <span><i class="sw ev-drop"></i>Call drop</span>
+        </div>
+        <canvas id="chart"></canvas>
+      </div>
+    </section>
+
+    <aside class="side">
+      <!-- PLANNER -->
+      <div class="panel-group" data-for="planner">
+        <div class="card intro">
+          <h3>How this works</h3>
+          <p>Every coloured pixel answers one question: <b>"How strong is the signal here, and from which tower?"</b></p>
+          <p class="muted">Hover anywhere on the map to see the full calculation. Drag a tower to move it. Change tilt, azimuth or power below and watch the map update.</p>
+        </div>
+        <div class="card">
+          <h3>Network settings</h3>
+          <label class="field">Band
+            <select id="bandSel"></select>
+          </label>
+          <label class="field">Environment (path loss model)
+            <select id="envSel"></select>
+          </label>
+          <label class="field">Network load <b id="loadVal"></b>
+            <input type="range" id="loadRange" min="0" max="100" step="5">
+          </label>
+          <label class="check"><input type="checkbox" id="shadowChk"> Buildings / shadowing (random +-6 dB)</label>
+          <label class="check"><input type="checkbox" id="indoorChk"> Users are indoors (-15 dB wall loss)</label>
+        </div>
+        <div class="card">
+          <h3>Towers (sites)</h3>
+          <div class="chips" id="siteChips"></div>
+          <div class="btn-row">
+            <button class="btn" id="addSiteBtn">+ Add tower</button>
+            <button class="btn ghost" id="delSiteBtn">Delete selected</button>
+            <button class="btn ghost" id="resetCityBtn">Reset city</button>
+          </div>
+        </div>
+        <div class="card editor-slot"></div>
+        <div class="card" id="layerHelp"></div>
+      </div>
+
+      <!-- DRIVE TEST -->
+      <div class="panel-group" data-for="drive" hidden>
+        <div class="card">
+          <h3>Route</h3>
+          <label class="field">Choose a route
+            <select id="routeSel"></select>
+          </label>
+          <div class="btn-row">
+            <button class="btn ghost" id="drawRouteBtn">Draw my own route</button>
+            <button class="btn ghost" id="finishRouteBtn" hidden>Finish route</button>
+          </div>
+          <label class="field">Vehicle speed
+            <select id="ueSpeedSel">
+              <option value="20">20 km/h (walking/cycling)</option>
+              <option value="40" selected>40 km/h (city car)</option>
+              <option value="80">80 km/h (highway)</option>
+            </select>
+          </label>
+          <label class="field">Simulation speed
+            <select id="simSpeedSel">
+              <option value="1">1x real time</option>
+              <option value="5">5x</option>
+              <option value="10" selected>10x</option>
+              <option value="30">30x</option>
+            </select>
+          </label>
+          <div class="btn-row">
+            <button class="btn primary" id="playBtn">Start drive</button>
+            <button class="btn ghost" id="resetDriveBtn">Reset</button>
+            <button class="btn ghost" id="csvBtn" disabled>Export log (CSV)</button>
+          </div>
+          <div class="progress"><div id="progressBar"></div></div>
+        </div>
+        <div class="card">
+          <h3>Phone screen (live)</h3>
+          <div class="live" id="live"></div>
+        </div>
+        <div class="card">
+          <h3>Event log</h3>
+          <ol class="events" id="events"><li class="muted">Start the drive to see handovers and drops.</li></ol>
+        </div>
+        <div class="card" id="driveSummary" hidden></div>
+      </div>
+
+      <!-- FIX THE NETWORK -->
+      <div class="panel-group" data-for="fix" hidden>
+        <div class="card">
+          <h3>Customer complaints</h3>
+          <p class="muted">Each case breaks the city in one realistic way. Find the cause and fix it by changing the towers, just like an RF optimization engineer.</p>
+          <div class="scenarios" id="scenarioList"></div>
+        </div>
+        <div class="card" id="scenarioCard" hidden></div>
+        <div class="card editor-slot"></div>
+      </div>
+    </aside>
+  </main>
+
+  <main id="calcView" class="page" hidden></main>
+  <main id="learnView" class="page" hidden></main>
+
+  <template id="editorTpl">
+    <h3 class="ed-title"></h3>
+    <div class="ed-grid">
+      <label class="field">Name <input type="text" class="ed-name" maxlength="24"></label>
+      <label class="field">Antenna height <b class="ed-hval"></b>
+        <input type="range" class="ed-height" min="10" max="80" step="1">
+      </label>
+    </div>
+    <div class="sectors"></div>
+    <p class="muted small">Azimuth = direction the antenna faces (0 = North, 90 = East). Tilt = how far it points down. PCI = cell ID the phone sees.</p>
+  </template>
+
+  <script src="js/rf.js"></script>
+  <script src="js/network.js"></script>
+  <script src="js/scenarios.js"></script>
+  <script src="js/drive.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/tools.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
